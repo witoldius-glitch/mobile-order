@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Мобильный бланк заказа Price Inter-S</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <style>
+    body { -webkit-tap-highlight-color: transparent; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .sticky-tabs { position: sticky; top: 0; z-index: 40; }
+    .product-card { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+    .product-card:active { transform: scale(0.98); }
+    .badge-active { background-color: #3b82f6; color: white; }
+  </style>
+</head>
+<body class="bg-gray-50 pb-32 select-none">
+
+  <header class="bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between sticky top-0 z-50 shadow-sm">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center text-xl shadow-md shadow-blue-200">
+        <i class="fa-solid fa-shop"></i>
+      </div>
+      <div>
+        <h1 class="font-bold text-gray-900 text-base leading-tight">Price Inter-S</h1>
+        <p class="text-[11px] text-green-600 flex items-center font-medium mt-0.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-green-500 mr-1 animate-pulse"></span> Клиент: Виталий
+        </p>
+      </div>
+    </div>
+    <button onclick="window.location.reload()" class="w-9 h-9 rounded-lg bg-gray-50 text-gray-500 flex items-center justify-center active:bg-gray-100">
+      <i class="fa-solid fa-arrow-rotate-right text-sm"></i>
+    </button>
+  </header>
+
+  <div class="p-3 bg-gray-100 border-b border-gray-200 sticky-tabs shadow-sm">
+    <div class="grid grid-cols-2 gap-2 bg-white p-1 rounded-xl border border-gray-200">
+      <button id="btn-prepayment" onclick="setPaymentType('prepayment')" class="py-2.5 px-2 rounded-lg text-center transition-all duration-150 border border-transparent badge-active shadow-sm">
+        <span class="block font-bold text-base leading-tight">1. Предоплата</span>
+        <span class="block text-[10px] opacity-80 mt-0.5">Столбец H</span>
+      </button>
+      <button id="btn-deferment" onclick="setPaymentType('deferment')" class="py-2.5 px-2 rounded-lg text-center transition-all duration-150 border border-transparent text-gray-500 hover:bg-gray-50">
+        <span class="block font-bold text-base leading-tight">2. Отсрочка</span>
+        <span class="block text-[10px] opacity-80 mt-0.5">Столбец I</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="p-4 space-y-3 bg-white border-b border-gray-100 shadow-sm">
+    <div class="relative">
+      <i class="fa-solid fa-magnifying-glass absolute left-3 top-3.5 text-gray-400 text-sm"></i>
+      <input type="text" id="search-input" oninput="filterProducts()" placeholder="Поиск по артикулу или названию..." class="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:bg-white transition-all">
+    </div>
+    
+    <div class="flex space-x-1.5 overflow-x-auto pb-1 scrollbar-none">
+      <button id="cat-all" onclick="setCategory('all')" class="px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap bg-blue-600 text-white transition-all">Все товары</button>
+      <button id="cat-kosmetika" onclick="setCategory('Косметика')" class="px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap bg-gray-100 text-gray-600 transition-all">Косметика</button>
+      <button id="cat-khimiya" onclick="setCategory('Бытовая химия')" class="px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap bg-gray-100 text-gray-600 transition-all">Бытовая химия</button>
+      <button id="cat-gigiena" onclick="setCategory('Гигиена')" class="px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap bg-gray-100 text-gray-600 transition-all">Гигиена</button>
+    </div>
+  </div>
+
+  <main class="p-4 space-y-3" id="products-container">
+    </main>
+
+  <div id="cart-bar" class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-xl transform translate-y-full transition-transform duration-300 z-50 flex items-center justify-between rounded-t-2xl">
+    <div onclick="toggleCartModal()" class="flex items-center space-x-3 cursor-pointer active:opacity-70">
+      <div class="w-12 h-12 bg-blue-600 text-white rounded-xl flex items-center justify-center text-xl relative shadow-md shadow-blue-200">
+        <i class="fa-solid fa-basket-shopping"></i>
+        <span id="cart-count-badge" class="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-white">0</span>
+      </div>
+      <div>
+        <p class="text-xs text-gray-400 font-medium">Ваш заказ:</p>
+        <p id="cart-total-price" class="text-base font-black text-gray-900">0.00 €</p>
+      </div>
+    </div>
+    <button onclick="toggleCartModal()" class="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-sm px-6 py-3 rounded-xl transition duration-150 shadow-md shadow-blue-100 flex items-center space-x-2">
+      <span>Просмотр заказа</span>
+      <i class="fa-solid fa-arrow-right text-xs"></i>
+    </button>
+  </div>
+
+  <div id="cart-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden transition-opacity opacity-0 flex flex-col justify-end">
+    <div class="bg-white rounded-t-3xl max-h-[85vh] flex flex-col transform translate-y-full transition-transform duration-300">
+      <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50 rounded-t-3xl">
+        <div class="flex items-center space-x-2.5">
+          <i class="fa-solid fa-cart-flatbed text-blue-600 text-lg"></i>
+          <h2 class="text-base font-bold text-gray-900">Выбранные товары</h2>
+        </div>
+        <button onclick="toggleCartModal()" class="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center active:bg-gray-300">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+
+      <div class="overflow-y-auto p-4 space-y-3 flex-1 min-h-[200px]" id="cart-items-list">
+        </div>
+
+      <div class="p-5 border-t border-gray-100 space-y-4 bg-white">
+        <div class="space-y-1.5 bg-gray-50 p-3 rounded-xl border border-gray-100">
+          <div class="flex justify-between text-xs text-gray-500">
+            <span>Всего позиций:</span>
+            <span id="modal-total-count" class="font-semibold text-gray-800">0 шт.</span>
+          </div>
+          <div class="flex justify-between text-sm pt-1.5 border-t border-dashed border-gray-200 font-bold text-gray-900">
+            <span>Итого без НДС, евро:</span>
+            <span id="modal-total-sum" class="text-blue-600 text-base">0.00 €</span>
+          </div>
+        </div>
+
+        <button onclick="submitOrder()" class="w-full bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold py-3.5 rounded-xl transition duration-150 shadow-lg shadow-green-100 flex items-center justify-center space-x-2 text-base">
+          <i class="fa-brands fa-whatsapp text-lg"></i>
+          <span>Отправить заказ в Мессенджер</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // БАЗА ДАННЫХ ТОВАРОВ (Выгрузка из вашей Google Таблицы)
+    const products = [
+      { id: "K-101", category: "Косметика", title: "Крем-мыло Dove Нежное увлажнение", pricePrepayment: 1.45, priceDeferment: 1.65, boxQty: 12 },
+      { id: "K-102", category: "Косметика", title: "Шампунь Head & Shoulders Основной уход", pricePrepayment: 3.50, priceDeferment: 3.90, boxQty: 6 },
+      { id: "H-201", category: "Бытовая химия", title: "Гель для мытья посуды Fairy Лимон 450мл", pricePrepayment: 1.30, priceDeferment: 1.50, boxQty: 20 },
+      { id: "H-202", category: "Бытовая химия", title: "Капсулы для стирки Ariel Pods 3в1 (12 шт)", pricePrepayment: 5.40, priceDeferment: 6.10, boxQty: 8 },
+      { id: "G-301", category: "Гигиена", title: "Влажные салфетки Huggies Pure (56 шт)", pricePrepayment: 1.85, priceDeferment: 2.10, boxQty: 10 }
+    ];
+
+    // СОСТОЯНИЕ ПРИЛОЖЕНИЯ
+    let currentPaymentType = 'prepayment'; // По умолчанию '1. Предоплата' (Столбец H)
+    let currentCategory = 'all';
+    let cart = {}; // Структура: { "K-101": 2, "H-201": 1 }
+
+    // ИНИЦИАЛИЗАЦИЯ
+    window.onload = () => {
+      renderProducts();
+    };
+
+    // УПРАВЛЕНИЕ ТИПОМ ОПЛАТЫ
+    function setPaymentType(type) {
+      currentPaymentType = type;
+      const btnPre = document.getElementById('btn-prepayment');
+      const btnDef = document.getElementById('btn-deferment');
+      
+      if (type === 'prepayment') {
+        btnPre.className = "py-2.5 px-2 rounded-lg text-center transition-all duration-150 border border-transparent badge-active shadow-sm";
+        btnDef.className = "py-2.5 px-2 rounded-lg text-center transition-all duration-150 border border-transparent text-gray-500 hover:bg-gray-50";
+      } else {
+        btnDef.className = "py-2.5 px-2 rounded-lg text-center transition-all duration-150 border border-transparent badge-active shadow-sm";
+        btnPre.className = "py-2.5 px-2 rounded-lg text-center transition-all duration-150 border border-transparent text-gray-500 hover:bg-gray-50";
+      }
+      
+      renderProducts();
+      updateCartBar();
+    }
+
+    // УПРАВЛЕНИЕ КАТЕГОРИЯМИ
+    function setCategory(cat) {
+      currentCategory = cat;
+      const categories = ['all', 'Косметика', 'Бытовая химия', 'Гигиена'];
+      const ids = ['cat-all', 'cat-kosmetika', 'cat-khimiya', 'cat-gigiena'];
+      
+      ids.forEach((id, index) => {
+        const btn = document.getElementById(id);
+        if (categories[index] === cat) {
+          btn.className = "px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap bg-blue-600 text-white transition-all";
+        } else {
+          btn.className = "px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap bg-gray-100 text-gray-600 transition-all";
+        }
+      });
+      
+      filterProducts();
+    }
+
+    // ОТРИСОВКА КАТАЛОГА ТОВАРОВ
+    function renderProducts() {
+      const container = document.getElementById('products-container');
+      container.innerHTML = "";
+      
+      products.forEach(p => {
+        // Фильтр по категории
+        if (currentCategory !== 'all' && p.category !== currentCategory) return;
+        
+        // Фильтр по поисковому запросу
+        const searchVal = document.getElementById('search-input').value.toLowerCase();
+        if (searchVal && !p.title.toLowerCase().includes(searchVal) && !p.id.toLowerCase().includes(searchVal)) return;
+
+        const price = currentPaymentType === 'prepayment' ? p.pricePrepayment : p.priceDeferment;
+        const currentQty = cart[p.id] || 0;
+        
+        let actionButtonHTML = '';
+        if (currentQty === 0) {
+          actionButtonHTML = `
+            <button onclick="addToCart('${p.id}')" class="bg-blue-50 text-blue-600 font-bold text-xs px-3 py-2 rounded-lg border border-blue-100 active:bg-blue-600 active:text-white transition-all flex items-center space-x-1">
+              <i class="fa-solid fa-plus text-[10px]"></i> <span>Добавить</span>
+            </button>`;
+        } else {
+          actionButtonHTML = `
+            <div class="flex items-center space-x-2 bg-gray-100 p-0.5 rounded-lg border border-gray-200">
+              <button onclick="changeQty('${p.id}', -1)" class="w-7 h-7 bg-white rounded-md flex items-center justify-center text-gray-700 shadow-sm active:bg-gray-200 font-bold">-</button>
+              <span class="w-8 text-center text-sm font-black text-gray-900">${currentQty}</span>
+              <button onclick="changeQty('${p.id}', 1)" class="w-7 h-7 bg-white rounded-md flex items-center justify-center text-gray-700 shadow-sm active:bg-gray-200 font-bold">+</button>
+            </div>`;
+        }
+
+        const card = document.createElement('div');
+        card.className = "product-card bg-white p-3.5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between space-x-3";
+        card.innerHTML = `
+          <div class="flex items-center space-x-3 flex-1 min-w-0">
+            <div class="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 text-xl flex-shrink-0 border border-gray-100">
+              <i class="${p.category === 'Косметика' ? 'fa-solid fa-pump-soap' : p.category === 'Бытовая химия' ? 'fa-solid fa-soap' : 'fa-solid fa-box-tissue'}"></i>
+            </div>
+            <div class="min-w-0 flex-1">
+              <span class="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">арт. ${p.id}</span>
+              <h3 class="text-xs font-bold text-gray-800 truncate block mt-0.5" style="white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${p.title}</h3>
+              <div class="flex items-center space-x-2 mt-1">
+                <span class="text-sm font-black text-blue-600">${price.toFixed(2)} €</span>
+                <span class="text-[10px] bg-gray-100 text-gray-500 font-medium px-1.5 py-0.5 rounded-md">В кор.: ${p.boxQty} шт.</span>
+              </div>
+            </div>
+          </div>
+          <div class="flex-shrink-0">
+            ${actionButtonHTML}
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function filterProducts() {
+      renderProducts();
+    }
+
+    // ЛОГИКА ДОБАВЛЕНИЯ И ИЗМЕНЕНИЯ КОЛИЧЕСТВА
+    function addToCart(id) {
+      cart[id] = 1;
+      renderProducts();
+      updateCartBar();
+    }
+
+    function changeQty(id, delta) {
+      if (!cart[id]) return;
+      cart[id] += delta;
+      if (cart[id] <= 0) {
+        delete cart[id];
+      }
+      renderProducts();
+      updateCartBar();
+      if (document.getElementById('cart-modal').classList.contains('opacity-100')) {
+        renderCartModalItems();
+      }
+    }
+
+    // ОБНОВЛЕНИЕ ПЛАВАЮЩЕЙ ПАНЕЛИ КОРЗИНЫ
+    function updateCartBar() {
+      const bar = document.getElementById('cart-bar');
+      const badge = document.getElementById('cart-count-badge');
+      const totalPriceEl = document.getElementById('cart-total-price');
+      
+      let uniqueItemsCount = Object.keys(cart).length;
+      let totalSum = 0;
+      
+      for (let id in cart) {
+        const p = products.find(prod => prod.id === id);
+        const price = currentPaymentType === 'prepayment' ? p.pricePrepayment : p.priceDeferment;
+        totalSum += cart[id] * price;
+      }
+      
+      if (uniqueItemsCount > 0) {
+        bar.classList.remove('translate-y-full');
+        badge.innerText = uniqueItemsCount;
+        totalPriceEl.innerText = totalSum.toFixed(2) + " €";
+        
+        // Для модалки
+        document.getElementById('modal-total-count').innerText = uniqueItemsCount + " шт.";
+        document.getElementById('modal-total-sum').innerText = totalSum.toFixed(2) + " €";
+      } else {
+        bar.classList.add('translate-y-full');
+        toggleCartModalClose();
+      }
+    }
+
+    // УПРАВЛЕНИЕ ОКНОМ КОРЗИНЫ
+    function toggleCartModal() {
+      const modal = document.getElementById('cart-modal');
+      const inner = modal.querySelector('.max-h-\\[85vh\\]');
+      
+      if (modal.classList.contains('hidden')) {
+        modal.classList.remove('hidden');
+        renderCartModalItems();
+        setTimeout(() => {
+          modal.classList.remove('opacity-0');
+          modal.classList.add('opacity-100');
+          inner.classList.remove('translate-y-full');
+        }, 10);
+      } else {
+        toggleCartModalClose();
+      }
+    }
+
+    function toggleCartModalClose() {
+      const modal = document.getElementById('cart-modal');
+      const inner = modal.querySelector('.max-h-\\[85vh\\]');
+      if (!modal.classList.contains('hidden')) {
+        modal.classList.remove('opacity-100');
+        modal.classList.add('opacity-0');
+        inner.classList.add('translate-y-full');
+        setTimeout(() => {
+          modal.classList.add('hidden');
+        }, 300);
+      }
+    }
+
+    // ОТРИСОВКА ЭЛЕМЕНТОВ ВНУТРИ ОКНА КОРЗИНЫ
+    function renderCartModalItems() {
+      const list = document.getElementById('cart-items-list');
+      list.innerHTML = "";
+      
+      let hasItems = false;
+      for (let id in cart) {
+        hasItems = true;
+        const p = products.find(prod => prod.id === id);
+        const price = currentPaymentType === 'prepayment' ? p.pricePrepayment : p.priceDeferment;
+        const qty = cart[id];
+        const sum = qty * price;
+        
+        // Считаем кратность коробкам для подсказки
+        const boxes = Math.floor(qty / p.boxQty);
+        const remainder = qty % p.boxQty;
+        let packageTipHTML = '';
+        if (remainder === 0) {
+          packageTipHTML = `<span class="text-[10px] text-green-600 font-semibold bg-green-50 px-1.5 py-0.5 rounded-md mt-1 inline-block"><i class="fa-solid fa-circle-check"></i> Ровно ${boxes} кор.</span>`;
+        } else {
+          const nextWholeBoxQty = (boxes + 1) * p.boxQty;
+          packageTipHTML = `<button onclick="adjustToBox('${p.id}', ${nextWholeBoxQty})" class="text-[10px] text-amber-600 font-bold bg-amber-50 hover:bg-amber-100 px-1.5 py-0.5 rounded-md mt-1 inline-block text-left border border-amber-200">⚠️ Не кратно коробке. Округлить до ${nextWholeBoxQty} шт.?</button>`;
+        }
+
+        const row = document.createElement('div');
+        row.className = "bg-gray-50 p-3 rounded-xl border border-gray-100 space-y-2";
+        row.innerHTML = `
+          <div class="flex justify-between items-start space-x-2">
+            <div class="min-w-0 flex-1">
+              <span class="text-[9px] font-bold text-gray-400">арт. ${p.id}</span>
+              <h4 class="text-xs font-bold text-gray-800 truncate">${p.title}</h4>
+              <div class="text-[11px] font-black text-blue-600 mt-0.5">${price.toFixed(2)} € × ${qty} = ${sum.toFixed(2)} €</div>
+              ${packageTipHTML}
+            </div>
+            <div class="flex items-center space-x-1.5 bg-white p-0.5 rounded-lg border border-gray-200 flex-shrink-0 shadow-sm">
+              <button onclick="changeQty('${p.id}', -1)" class="w-6 h-6 rounded-md bg-gray-50 flex items-center justify-center font-bold text-gray-600 text-xs">-</button>
+              <span class="w-6 text-center text-xs font-black text-gray-900">${qty}</span>
+              <button onclick="changeQty('${p.id}', 1)" class="w-6 h-6 rounded-md bg-gray-50 flex items-center justify-center font-bold text-gray-600 text-xs">+</button>
+            </div>
+          </div>
+        `;
+        list.appendChild(row);
+      }
+      
+      if (!hasItems) {
+        list.innerHTML = `<div class="text-center py-8 text-gray-400 text-xs font-medium">Ваша корзина пуста</div>`;
+      }
+    }
+
+    function adjustToBox(id, targetQty) {
+      cart[id] = targetQty;
+      renderProducts();
+      updateCartBar();
+      renderCartModalItems();
+    }
+
+    // ОТПРАВКА ЗАКАЗА (ФОРМИРОВАНИЕ ТЕКСТА ДЛЯ TELEGRAM/WHATSAPP)
+    function submitOrder() {
+      let text = "📦 *НОВЫЙ ЗАКАЗ: Price Inter-S*\n";
+      text += "👤 *Заказчик:* Виталий\n";
+      text += "💳 *Условия оплаты:* " + (currentPaymentType === 'prepayment' ? "Предоплата (Столбец H)" : "Отсрочка (Столбец I)") + "\n";
+      text += "📅 *Дата:* " + new Date().toLocaleDateString('ru-RU') + "\n";
+      text += "---------------------------------------\n\n";
+      
+      let totalSum = 0;
+      let count = 1;
+      
+      for (let id in cart) {
+        const p = products.find(prod => prod.id === id);
+        const price = currentPaymentType === 'prepayment' ? p.pricePrepayment : p.priceDeferment;
+        const qty = cart[id];
+        const sum = qty * price;
+        totalSum += sum;
+        
+        text += count + ") " + p.title + "\n";
+        text += "   *Арт:* " + id + " | *Кол-во:* " + qty + " шт.\n";
+        text += "   *Цена:* " + price.toFixed(2) + " € | *Сумма:* " + sum.toFixed(2) + " €\n\n";
+        count++;
+      }
+      
+      text += "---------------------------------------\n";
+      text += "💰 *ИТОГО БЕЗ НДС:* " + totalSum.toFixed(2) + " €\n\n";
+      text += "_Создано через Мобильное приложение заказа_";
+
+      // Кодируем текст для URL ссылки мессенджера
+      const encodedText = encodeURIComponent(text);
+      
+      // Открываем универсальный шеринг в WhatsApp (клиент сможет выбрать менеджера)
+      const whatsappUrl = "https://api.whatsapp.com/send?text=" + encodedText;
+      window.open(whatsappUrl, '_blank');
+    }
+  </script>
+</body>
+</html>
