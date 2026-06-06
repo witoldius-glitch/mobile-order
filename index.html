@@ -28,14 +28,19 @@
         <i class="fa-solid fa-toolbox"></i>
       </div>
       <div>
-        <h1 class="font-bold text-gray-900 text-base leading-tight">Motive Каталог</h1>
+        <div class="flex items-center space-x-1.5">
+          <h1 class="font-bold text-gray-900 text-base leading-tight">Motive Каталог</h1>
+          <!-- Индикатор фонового обновления -->
+          <span id="sync-badge" class="hidden text-[9px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded animate-pulse">Обновление...</span>
+        </div>
         <p class="text-[11px] text-green-600 flex items-center font-medium mt-0.5">
           <span class="w-1.5 h-1.5 rounded-full bg-green-500 mr-1 animate-pulse"></span> Мобильный заказ в реальном времени
         </p>
       </div>
     </div>
-    <button onclick="loadTableData()" class="w-9 h-9 rounded-lg bg-gray-50 text-gray-500 flex items-center justify-center active:bg-gray-100">
-      <i class="fa-solid fa-arrow-rotate-right text-sm"></i>
+    <!-- Кнопка принудительного обновления со сбросом кэша -->
+    <button onclick="forceRefreshData()" class="w-9 h-9 rounded-lg bg-gray-50 text-gray-500 flex items-center justify-center active:bg-gray-100 transition-all">
+      <i id="refresh-icon" class="fa-solid fa-arrow-rotate-right text-sm"></i>
     </button>
   </header>
 
@@ -59,7 +64,7 @@
     <p id="status-text" class="text-sm text-gray-500 font-medium">Загрузка актуального прайс-листа из Google Таблицы...</p>
   </div>
 
-  <!-- ОСНОВНОЙ КОНТЕНТ (Скрыт во время загрузки) -->
+  <!-- ОСНОВНОЙ КОНТЕНТ -->
   <div id="main-content" class="hidden">
     <!-- ПОИСК И ФИЛЬТРЫ -->
     <div class="p-4 space-y-3 bg-white border-b border-gray-100 shadow-sm">
@@ -122,13 +127,11 @@
         </div>
 
         <div class="space-y-2.5">
-          <!-- Кнопка WhatsApp -->
           <button onclick="submitOrder('whatsapp')" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 rounded-xl flex items-center justify-center space-x-2 text-base shadow-md transition-all duration-150 active:scale-[0.99]">
             <i class="fa-brands fa-whatsapp text-lg"></i>
             <span>Отправить в WhatsApp</span>
           </button>
           
-          <!-- Кнопка Электронной почты -->
           <button onclick="submitOrder('email')" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl flex items-center justify-center space-x-2 text-base shadow-md transition-all duration-150 active:scale-[0.99]">
             <i class="fa-solid fa-envelope text-lg"></i>
             <span>Отправить на Email</span>
@@ -140,10 +143,14 @@
 
   <script>
     // ⚠️ ВСТАВЬТЕ СЮДА URL ВАШЕГО ВЕБ-ПРИЛОЖЕНИЯ ИЗ GOOGLE SCRIPTS
-    const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbx7OvWnnmnSTD-nCV5GixAeML5YqCKSYoUvMRrllFDKgh3ys1QBKMwErM7-4i14KA1F/exec"; 
+    const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxDpnHpH-DwL8v7HOO69hMHniKUNQwIfEW1bKXoeKKpVhWmFubmXEiCw0Y5yJOj88eS/exec"; 
     
-    // Резервный ID таблицы, если веб-приложение не настроено
-    const SPREADSHEET_ID = "1m1kAXGPAp02rqzL4X61TtCMFD6y-TRm0bmBnymBBr4QU";
+    // Резервный ID таблицы
+    const urlParams = new URLSearchParams(window.location.search);
+    const SPREADSHEET_ID = urlParams.get('sheetId') || "1m1kAXGPAp02rqzL4X61TtCMFD6y-TRm0bmBnymBBr4Q";
+
+    // Уникальный ключ кэша для этой конкретной таблицы
+    const CACHE_KEY = `motive_catalog_cache_${SPREADSHEET_ID}`;
 
     let products = [];
     let categories = [];
@@ -151,40 +158,93 @@
     let currentCategory = 'all';
     let cart = {}; 
 
-    // ВЫГРУЗКА ИЗ ТАБЛИЦЫ ЧЕРЕЗ АППС-СКРИПТ (С АВТОМАТИЧЕСКИМ ИЗВЛЕЧЕНИЕМ СКРИНШОТОВ)
-    function loadTableData() {
+    // ВЫГРУЗКА ИЗ ТАБЛИЦЫ С ИНТЕЛЛЕКТУАЛЬНЫМ КЭШИРОВАНИЕМ
+    function loadTableData(bypassServerCache = false) {
+      // Шаг 1. Пытаемся мгновенно подгрузить локальный кэш
+      const cachedDataRaw = localStorage.getItem(CACHE_KEY);
+      let hasLocalCache = false;
+
+      if (cachedDataRaw && !bypassServerCache) {
+        try {
+          const cachedData = JSON.parse(cachedDataRaw);
+          if (cachedData && cachedData.products && cachedData.products.length > 0) {
+            products = cachedData.products;
+            hasLocalCache = true;
+            
+            // Мгновенно отображаем каталог из памяти
+            processLoadedData();
+            
+            // Показываем деликатную надпись «Обновление данных...» в шапке
+            document.getElementById('sync-badge').classList.remove('hidden');
+          }
+        } catch (e) {
+          console.warn("Кэш поврежден, загружаем напрямую", e);
+        }
+      }
+
+      // Шаг 2. Запрашиваем актуальный прайс в фоновом режиме
       if (GOOGLE_WEB_APP_URL && GOOGLE_WEB_APP_URL.includes("script.google.com")) {
-        // 📝 АВТО-ЛЕЧЕНИЕ: Автоматически вырезаем мультиаккаунтные префиксы вроде /u/1/ или /u/0/ из ссылки!
         const cleanedUrl = GOOGLE_WEB_APP_URL.replace(/\/u\/\d+\//, "/");
         
-        const urlWithAction = cleanedUrl + (cleanedUrl.indexOf('?') !== -1 ? '&' : '?') + "action=get_catalog";
+        // Добавляем параметр spreadsheetId и флаг принудительного сброса кэша
+        let urlWithParams = `${cleanedUrl}${cleanedUrl.indexOf('?') !== -1 ? '&' : '?'}action=get_catalog&spreadsheetId=${SPREADSHEET_ID}`;
+        if (bypassServerCache) {
+          urlWithParams += "&bypassCache=true";
+        }
         
-        fetch(urlWithAction)
+        fetch(urlWithParams)
           .then(response => {
             if (!response.ok) throw new Error("Ошибка связи со скриптом Google.");
             return response.json();
           })
           .then(res => {
             if (res.success && res.products && res.products.length > 0) {
+              // Проверяем, изменились ли данные. Если нет — не перерисовываем интерфейс зря
+              const isDataChanged = JSON.stringify(products) !== JSON.stringify(res.products);
+              
               products = res.products;
-              processLoadedData();
+              
+              // Сохраняем свежие данные в локальную память телефона
+              localStorage.setItem(CACHE_KEY, JSON.stringify({ products: res.products, time: Date.now() }));
+              
+              if (isDataChanged || !hasLocalCache) {
+                processLoadedData();
+              }
             } else {
               throw new Error(res.error || "Скрипт вернул пустой каталог.");
             }
           })
           .catch(err => {
-            console.warn("Сбой парсинга скриншотов через Web App, включаем резервный CSV-канал:", err);
-            showStatusError(
-              "Ошибка загрузки", 
-              `Убедитесь, что при публикации Веб-приложения в Google Scripts вы выбрали доступ <b>«Кто имеет доступ: Все (Anyone)»</b>.<br><br><span class="text-gray-400 text-[10px] block font-mono">Системные сведения: ${err.message}</span>`
-            );
+            console.warn("Сбой Web App:", err);
+            if (!hasLocalCache) {
+              loadBackupCSVData();
+            }
+          })
+          .finally(() => {
+            // Прячем надпись «Обновление данных»
+            document.getElementById('sync-badge').classList.add('hidden');
+            document.getElementById('refresh-icon').classList.remove('animate-spin');
           });
       } else {
-        loadBackupCSVData();
+        if (!hasLocalCache) {
+          loadBackupCSVData();
+        }
       }
     }
 
-    // Резервная загрузка через CSV (если веб-приложение еще не опубликовано пользователем)
+    // Принудительное ручное обновление со сбросом кэша
+    function forceRefreshData() {
+      const icon = document.getElementById('refresh-icon');
+      icon.classList.add('animate-spin');
+      
+      // Показываем стандартный лоадер на весь экран
+      document.getElementById('status-screen').classList.remove('hidden');
+      document.getElementById('main-content').classList.add('hidden');
+      
+      loadTableData(true); // Запуск с флагом bypassServerCache = true
+    }
+
+    // Резервная загрузка через CSV (с поддержкой динамического ID)
     function loadBackupCSVData() {
       const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&gid=1203362757`;
       fetch(url)
@@ -200,7 +260,7 @@
         });
     }
 
-    // Обработка данных, полученных через умный бэкенд Google (уже связанных и очищенных!)
+    // Обработка загруженных данных
     function processLoadedData() {
       let uniqueCategories = new Set();
       products.forEach(p => {
@@ -215,7 +275,7 @@
       renderProducts();
     }
 
-    // Разбор резервного CSV (если бэкенд не запущен)
+    // Разбор резервного CSV
     function parseBackupCSV(csvText) {
       const lines = csvText.split(/\r?\n/);
       let loadedProducts = [];
@@ -242,7 +302,7 @@
             id: art,
             category: cat,
             title: title,
-            image: "", // В CSV скриншоты недоступны
+            image: "", 
             pricePrepayment: pricePre,
             priceDeferment: priceDef,
             boxQty: box
@@ -340,27 +400,22 @@
         else if (catLower.includes('инструмент')) iconClass = 'fa-solid fa-hammer';
 
         const card = document.createElement('div');
-        // Изменен align с flex items-center на items-start для красивого выравнивания по верху
         card.className = "product-card bg-white p-3.5 rounded-2xl border border-gray-100 shadow-sm flex items-start justify-between space-x-3";
         card.innerHTML = `
           <div class="flex items-start space-x-3 flex-1 min-w-0">
-            <!-- Скриншот из Google Sheets -->
             <img src="${p.image}" class="w-14 h-14 object-cover rounded-xl bg-gray-50 border border-gray-100 flex-shrink-0" style="${p.image ? '' : 'display:none;'}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
             <div class="w-14 h-14 bg-gray-100 rounded-xl flex-shrink-0 border border-gray-100 flex items-center justify-center text-blue-900 text-xl" style="${p.image ? 'display:none;' : ''}">
               <i class="${iconClass}"></i>
             </div>
             <div class="min-w-0 flex-1">
               <span class="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">арт. ${p.id}</span>
-              <!-- ИСПРАВЛЕНО: Убрано жесткое ограничение lines-clamp. Текст переносится свободно без наложений! -->
               <h3 class="text-xs font-bold text-gray-800 mt-0.5 leading-snug break-words">${p.title}</h3>
-              <!-- ИСПРАВЛЕНО: Добавлен flex-wrap и gap для безопасного отображения цен даже на самых узких телефонах -->
               <div class="flex flex-wrap items-center gap-1.5 mt-2">
                 <span class="text-sm font-black text-blue-900 leading-none">${price.toFixed(2)} €</span>
                 <span class="text-[10px] bg-gray-100 text-gray-500 font-semibold px-1.5 py-0.5 rounded-md leading-none">Уп: ${p.boxQty} шт.</span>
               </div>
             </div>
           </div>
-          <!-- Кнопки добавления выровнены по верху карточки -->
           <div class="flex-shrink-0 mt-1">${actionButtonHTML}</div>
         `;
         container.appendChild(card);
@@ -457,7 +512,8 @@
               <span class="text-[9px] font-bold text-gray-400">арт. ${p.id}</span>
               <h4 class="text-xs font-bold text-gray-800 truncate">${p.title}</h4>
               <div class="text-[11px] font-black text-blue-900 mt-0.5">${price.toFixed(2)} € × ${qty} шт. = ${(qty * price).toFixed(2)} €</div>
-              <span class="text-[10px] text-green-600 font-semibold bg-green-50 px-1.5 py-0.5 rounded-md mt-1 inline-block"><i class="fa-solid fa-circle-check"></i> Кратность коробке соблюдена (${boxes} кор.)</span>
+              <span class="text-[10px] text-green-600 font-semibold bg-green-50 px-1.5 py-0.5 rounded-md mt-1 inline-block"><i class="fa-solid fa-circle-check"></i> Кратность коробке соблюдена (${boxes}
+                кор.)</span>
             </div>
             <div class="flex items-center space-x-1.5 bg-white p-0.5 rounded-lg border border-gray-200 flex-shrink-0 shadow-sm">
               <button onclick="changeQty('${p.id}', -1)" class="w-6 h-6 rounded-md bg-gray-50 flex items-center justify-center font-bold text-gray-600 text-xs">-</button>
