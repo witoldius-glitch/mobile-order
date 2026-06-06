@@ -143,7 +143,7 @@
 
   <script>
     // ⚠️ ВСТАВЬТЕ СЮДА URL ВАШЕГО ВЕБ-ПРИЛОЖЕНИЯ ИЗ GOOGLE SCRIPTS
-    const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxDpnHpH-DwL8v7HOO69hMHniKUNQwIfEW1bKXoeKKpVhWmFubmXEiCw0Y5yJOj88eS/exec"; 
+    const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwlgUa13M54qyeV1C-FgvPERHFwX_1LnLYfvT-G9zH29bn3fzDhAva3Tm_HtWIXWVb2/exec"; 
     
     // Резервный ID таблицы
     const urlParams = new URLSearchParams(window.location.search);
@@ -181,6 +181,7 @@
           console.warn("Кэш поврежден, загружаем напрямую", e);
         }
       }
+
 
       // Шаг 2. Запрашиваем актуальный прайс в фоновом режиме
       if (GOOGLE_WEB_APP_URL && GOOGLE_WEB_APP_URL.includes("script.google.com")) {
