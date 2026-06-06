@@ -140,10 +140,10 @@
 
   <script>
     // ⚠️ ВСТАВЬТЕ СЮДА URL ВАШЕГО ВЕБ-ПРИЛОЖЕНИЯ ИЗ GOOGLE SCRIPTS
-    const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwKzhihXP-RO_lrUzW4K0TdJRGQmw8pwgVHair1dtB0ULtLrOK7rcLzQBjY4ue-J8pa/exec"; 
+    const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbx7OvWnnmnSTD-nCV5GixAeML5YqCKSYoUvMRrllFDKgh3ys1QBKMwErM7-4i14KA1F/exec"; 
     
     // Резервный ID таблицы, если веб-приложение не настроено
-    const SPREADSHEET_ID = "1m1kAXGPAp02rqzL4X61TtCMFD6y-TRm0bmBnymBBr4Q";
+    const SPREADSHEET_ID = "1m1kAXGPAp02rqzL4X61TtCMFD6y-TRm0bmBnymBBr4QU";
 
     let products = [];
     let categories = [];
@@ -154,7 +154,10 @@
     // ВЫГРУЗКА ИЗ ТАБЛИЦЫ ЧЕРЕЗ АППС-СКРИПТ (С АВТОМАТИЧЕСКИМ ИЗВЛЕЧЕНИЕМ СКРИНШОТОВ)
     function loadTableData() {
       if (GOOGLE_WEB_APP_URL && GOOGLE_WEB_APP_URL.includes("script.google.com")) {
-        const urlWithAction = GOOGLE_WEB_APP_URL + (GOOGLE_WEB_APP_URL.indexOf('?') !== -1 ? '&' : '?') + "action=get_catalog";
+        // 📝 АВТО-ЛЕЧЕНИЕ: Автоматически вырезаем мультиаккаунтные префиксы вроде /u/1/ или /u/0/ из ссылки!
+        const cleanedUrl = GOOGLE_WEB_APP_URL.replace(/\/u\/\d+\//, "/");
+        
+        const urlWithAction = cleanedUrl + (cleanedUrl.indexOf('?') !== -1 ? '&' : '?') + "action=get_catalog";
         
         fetch(urlWithAction)
           .then(response => {
@@ -171,7 +174,10 @@
           })
           .catch(err => {
             console.warn("Сбой парсинга скриншотов через Web App, включаем резервный CSV-канал:", err);
-            loadBackupCSVData();
+            showStatusError(
+              "Ошибка загрузки", 
+              `Убедитесь, что при публикации Веб-приложения в Google Scripts вы выбрали доступ <b>«Кто имеет доступ: Все (Anyone)»</b>.<br><br><span class="text-gray-400 text-[10px] block font-mono">Системные сведения: ${err.message}</span>`
+            );
           });
       } else {
         loadBackupCSVData();
@@ -266,7 +272,10 @@
 
     function showStatusError(title, desc) {
       document.getElementById('status-spinner').classList.add('hidden');
-      document.getElementById('status-text').innerHTML = `<span class="text-red-600 font-bold block text-base">${title}</span><span class="text-xs text-gray-500 block mt-1 px-4">${desc}</span>`;
+      document.getElementById('status-text').innerHTML = `
+        <span class="text-red-600 font-bold block text-base">${title}</span>
+        <span class="text-xs text-gray-500 block mt-2 px-4 leading-relaxed">${desc}</span>
+      `;
     }
 
     function renderCategoryBar() {
