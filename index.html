@@ -39,7 +39,7 @@
     </button>
   </header>
 
-  <!-- ПЕРЕКЛЮЧАТЕЛЬ УСЛОВИЙ ОПЛАТЫ (КРУПНЫЕ КНОПКИ 1 И 2) -->
+  <!-- ПЕРЕКЛЮЧАТЕЛЬ УСЛОВИЙ ОПЛАТЫ -->
   <div class="p-3 bg-gray-100 border-b border-gray-200 sticky-tabs shadow-sm">
     <div class="grid grid-cols-2 gap-2 bg-white p-1 rounded-xl border border-gray-200">
       <button id="btn-prepayment" onclick="setPaymentType('prepayment')" class="py-2.5 px-2 rounded-lg text-center transition-all duration-150 border border-transparent badge-active shadow-sm">
@@ -68,16 +68,12 @@
         <input type="text" id="search-input" oninput="filterProducts()" placeholder="Поиск по артикулу или названию..." class="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-900 focus:bg-white transition-all">
       </div>
       
-      <!-- Лента категорий (Формируется автоматически из столбца F) -->
-      <div class="flex space-x-1.5 overflow-x-auto pb-1 scrollbar-none" id="categories-bar">
-        <!-- Сюда вставятся ваши новые категории из столбца F -->
-      </div>
+      <!-- Лента категорий (Формируется автоматически) -->
+      <div class="flex space-x-1.5 overflow-x-auto pb-1 scrollbar-none" id="categories-bar"></div>
     </div>
 
     <!-- СПИСОК ТОВАРОВ -->
-    <main class="p-4 space-y-3" id="products-container">
-      <!-- Товары подгрузятся сюда -->
-    </main>
+    <main class="p-4 space-y-3" id="products-container"></main>
   </div>
 
   <!-- СТАТУС-БАР КОРЗИНЫ -->
@@ -134,19 +130,11 @@
   </div>
 
   <script>
-    // ⚠️ ID ВАШЕЙ НОВОЙ GOOGLE ТАБЛИЦЫ
-    const SPREADSHEET_ID = "1u3LawyAhIDN-XB9hDZp1Q7erkvkRiSOwpNESHYo4nYU";
+    // ⚠️ ВСТАВЬТЕ СЮДА URL ВАШЕГО ВЕБ-ПРИЛОЖЕНИЯ ИЗ GOOGLE SCRIPTS (начинается с https://script.google.com/...)
+    const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxTyVuiOEc7X5AsYYkwft30L9k3okrju1f_tDfxocoPOGiBfKk55YY89F4RLCIrPYu8/exec"; 
     
-    // Структура индексов колонок (A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7, I=8, J=9, K=10, L=11, M=12)
-    const COLS = {
-      articul: 0,   // Столбец A (Артикул)
-      image: 1,     // Столбец B (Фотография товара)
-      title: 2,     // Столбец C (Наименование товара)
-      category: 5,  // Столбец F (Назначение / Категория инструмента)
-      prepayment: 7,// Столбец H (Цена Предоплата)
-      deferment: 8, // Столбец I (Цена Отсрочка)
-      boxQty: 12    // Столбец M (Количество в коробке) - ИЗМЕНЕНО с E (4) на M (12)
-    };
+    // Резервный ID таблицы, если веб-приложение не настроено (сработает старый CSV-канал без картинок)
+    const SPREADSHEET_ID = "1m1kAXGPAp02rqzL4X61TtCMFD6y-TRm0bmBnymBBr4Q";
 
     let products = [];
     let categories = [];
@@ -154,71 +142,95 @@
     let currentCategory = 'all';
     let cart = {}; 
 
-    // ЗАГРУЗКА ДАННЫХ ИЗ GOOGLE SHEETS ЧЕРЕЗ CSV-ЭКСПОРТ (gid=1203362757)
+    // ВЫГРУЗКА ИЗ ТАБЛИЦЫ ЧЕРЕЗ АППС-СКРИПТ (С АВТОМАТИЧЕСКИМ ИЗВЛЕЧЕНИЕМ СКРИНШОТОВ)
     function loadTableData() {
-      if (!SPREADSHEET_ID || SPREADSHEET_ID.includes("ID_ВАШЕЙ")) {
-        showStatusError("Ошибка настройки", "Пожалуйста, укажите реальный SPREADSHEET_ID в коде файла.");
-        return;
+      // 1. Проверяем, настроен ли адрес веб-приложения для интеллектуального парсинга скриншотов
+      if (GOOGLE_WEB_APP_URL && GOOGLE_WEB_APP_URL.includes("script.google.com")) {
+        const urlWithAction = GOOGLE_WEB_APP_URL + (GOOGLE_WEB_APP_URL.indexOf('?') !== -1 ? '&' : '?') + "action=get_catalog";
+        
+        fetch(urlWithAction)
+          .then(response => {
+            if (!response.ok) throw new Error("Ошибка связи со скриптом Google.");
+            return response.json();
+          })
+          .then(res => {
+            if (res.success && res.products && res.products.length > 0) {
+              products = res.products;
+              processLoadedData();
+            } else {
+              throw new Error(res.error || "Скрипт вернул пустой каталог.");
+            }
+          })
+          .catch(err => {
+            console.warn("Сбой парсинга скриншотов через Web App, включаем резервный CSV-канал:", err);
+            loadBackupCSVData();
+          });
+      } else {
+        loadBackupCSVData();
       }
+    }
 
-      // Подключаемся к листу таблицы в режиме экспорта чистых данных
+    // Резервная загрузка через CSV (если веб-приложение еще не опубликовано пользователем)
+    function loadBackupCSVData() {
       const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&gid=1203362757`;
-
       fetch(url)
         .then(response => {
-          if (!response.ok) throw new Error("Не удалось получить доступ к таблице. Проверьте настройки доступа по ссылке.");
+          if (!response.ok) throw new Error("Проверьте общий доступ к таблице.");
           return response.text();
         })
         .then(csvText => {
-          parseCSVData(csvText);
+          parseBackupCSV(csvText);
         })
         .catch(err => {
-          showStatusError("Сбой подключения", err.message);
+          showStatusError("Ошибка загрузки", err.message);
         });
     }
 
-    // РАЗБОР CSV СТРОК И АВТОМАТИЧЕСКАЯ ГЕНЕРАЦИЯ КАТЕГОРИЙ И ТОВАРОВ
-    function parseCSVData(csvText) {
+    // Обработка данных, полученных через умный бэкенд Google (уже связанных и очищенных!)
+    function processLoadedData() {
+      let uniqueCategories = new Set();
+      products.forEach(p => {
+        if (p.category) uniqueCategories.add(p.category);
+      });
+      categories = Array.from(uniqueCategories);
+
+      document.getElementById('status-screen').classList.add('hidden');
+      document.getElementById('main-content').classList.remove('hidden');
+
+      renderCategoryBar();
+      renderProducts();
+    }
+
+    // Разбор резервного CSV (если бэкенд не запущен)
+    function parseBackupCSV(csvText) {
       const lines = csvText.split(/\r?\n/);
       let loadedProducts = [];
       let uniqueCategories = new Set();
+      let lastCategory = "Разное";
 
-      // Пропускаем шапку таблицы (начинаем со строки 2, индекс 1)
       for (let i = 1; i < lines.length; i++) {
         const row = parseCSVLine(lines[i]);
-        if (!row || row.length < 9 || !row[COLS.title]) continue;
+        if (!row || row.length < 9 || !row[2]) continue;
 
-        const art = String(row[COLS.articul] || "").trim();
-        const title = String(row[COLS.title]).trim();
-        const cat = String(row[COLS.category] || "Разное").trim();
+        const art = String(row[0] || "").trim();
+        const title = String(row[2]).trim();
         
-        // Чтение и очистка цен
-        const pricePre = parseFloat(String(row[COLS.prepayment]).replace(/[^\d.,]/g, '').replace(',', '.'));
-        const priceDef = parseFloat(String(row[COLS.deferment]).replace(/[^\d.,]/g, '').replace(',', '.'));
+        let cat = String(row[5] || "").trim();
+        if (cat === "") cat = lastCategory;
+        else lastCategory = cat;
         
-        // Считываем кратность из столбца M (индекс 12)
-        const box = parseInt(String(row[COLS.boxQty]).replace(/[^\d]/g, '')) || 1;
-        
-        // 📝 ИЗМЕНЕНО: Обработка формул изображений (=IMAGE или =HYPERLINK)
-        let imgUrl = String(row[COLS.image] || "").trim();
-        const formulaMatch = imgUrl.match(/=["']?IMAGE\s*\(\s*["']([^"']+)["']/i) || imgUrl.match(/=["']?HYPERLINK\s*\(\s*["']([^"']+)["']/i);
-        if (formulaMatch && formulaMatch[1]) {
-          imgUrl = formulaMatch[1].trim();
-        }
-        imgUrl = imgUrl.replace(/^["']|["']$/g, ''); // чистим кавычки
-
-        if (!imgUrl.startsWith("http")) {
-          imgUrl = ""; // Теперь оставляем пустым, чтобы срабатывала красивая иконка-заглушка категории!
-        }
+        const pricePre = parseFloat(String(row[7]).replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+        const priceDef = parseFloat(String(row[8]).replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+        const box = parseInt(String(row[12]).replace(/[^\d]/g, '')) || 1;
 
         if (art && title) {
           loadedProducts.push({
             id: art,
             category: cat,
             title: title,
-            image: imgUrl,
-            pricePrepayment: isNaN(pricePre) ? 0 : pricePre,
-            priceDeferment: isNaN(priceDef) ? 0 : priceDef,
+            image: "", // В CSV скриншоты недоступны
+            pricePrepayment: pricePre,
+            priceDeferment: priceDef,
             boxQty: box
           });
           uniqueCategories.add(cat);
@@ -227,16 +239,9 @@
 
       products = loadedProducts;
       categories = Array.from(uniqueCategories);
-
-      // Скрываем загрузчик, показываем каталог
-      document.getElementById('status-screen').classList.add('hidden');
-      document.getElementById('main-content').classList.remove('hidden');
-
-      renderCategoryBar();
-      renderProducts();
+      processLoadedData();
     }
 
-    // Функция безопасного разбора CSV-строки с учетом запятых внутри кавычек
     function parseCSVLine(text) {
       let p = '', r = [];
       let q = false;
@@ -256,7 +261,6 @@
       document.getElementById('status-text').innerHTML = `<span class="text-red-600 font-bold block text-base">${title}</span><span class="text-xs text-gray-500 block mt-1 px-4">${desc}</span>`;
     }
 
-    // РЕНДЕРИНГ ЛЕНТЫ КАТЕГОРИЙ (Динамические кнопки по столбцу F)
     function renderCategoryBar() {
       const bar = document.getElementById('categories-bar');
       bar.innerHTML = `<button id="cat-all" onclick="setCategory('all')" class="px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap bg-blue-900 text-white transition-all">Все товары</button>`;
@@ -266,8 +270,6 @@
         btn.innerText = cat;
         btn.onclick = () => setCategory(cat);
         btn.className = "px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap bg-gray-100 text-gray-600 transition-all";
-        
-        // Безопасная генерация ID без спецсимволов
         const safeId = "cat-" + cat.replace(/[^a-zA-Z0-9а-яА-Я]/g, '-');
         btn.id = safeId;
         bar.appendChild(btn);
@@ -276,7 +278,6 @@
 
     function setCategory(cat) {
       currentCategory = cat;
-      
       const buttons = document.getElementById('categories-bar').getElementsByTagName('button');
       for (let btn of buttons) {
         btn.className = "px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap bg-gray-100 text-gray-600 transition-all";
@@ -288,11 +289,9 @@
         const safeId = "cat-" + cat.replace(/[^a-zA-Z0-9а-яА-Я]/g, '-');
         document.getElementById(safeId).className = "px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap bg-blue-900 text-white transition-all";
       }
-      
       renderProducts();
     }
 
-    // ОТРИСОВКА КАТАЛОГА ТОВАРОВ
     function renderProducts() {
       const container = document.getElementById('products-container');
       container.innerHTML = "";
@@ -316,24 +315,18 @@
               <button onclick="changeQty('${p.id}', 1)" class="w-7 h-7 bg-white rounded-md flex items-center justify-center text-gray-700 shadow-sm active:bg-gray-200 font-bold">+</button>
              </div>`;
 
-        // Тематическая иконка-заглушка в зависимости от категории
         let iconClass = 'fa-solid fa-screwdriver-wrench';
         const catLower = p.category.toLowerCase();
-        if (catLower.includes('лент')) {
-          iconClass = 'fa-solid fa-tape';
-        } else if (catLower.includes('укрыт') || catLower.includes('защит')) {
-          iconClass = 'fa-solid fa-shield-halved';
-        } else if (catLower.includes('перчат') || catLower.includes('одежд')) {
-          iconClass = 'fa-solid fa-mitten';
-        } else if (catLower.includes('инструмент')) {
-          iconClass = 'fa-solid fa-hammer';
-        }
+        if (catLower.includes('лент')) iconClass = 'fa-solid fa-tape';
+        else if (catLower.includes('укрыт') || catLower.includes('защит')) iconClass = 'fa-solid fa-shield-halved';
+        else if (catLower.includes('перчат')) iconClass = 'fa-solid fa-mitten';
+        else if (catLower.includes('инструмент')) iconClass = 'fa-solid fa-hammer';
 
         const card = document.createElement('div');
         card.className = "product-card bg-white p-3.5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between space-x-3";
         card.innerHTML = `
           <div class="flex items-center space-x-3 flex-1 min-w-0">
-            <!-- Отображаем картинку из столбца B, а если она пустая или ломается - красивую иконку категории -->
+            <!-- Скриншот из Google Sheets (если пустой или ломается - аккуратная векторная иконка) -->
             <img src="${p.image}" class="w-14 h-14 object-cover rounded-xl bg-gray-50 border border-gray-100 flex-shrink-0" style="${p.image ? '' : 'display:none;'}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
             <div class="w-14 h-14 bg-gray-100 rounded-xl flex-shrink-0 border border-gray-100 flex items-center justify-center text-blue-900 text-xl" style="${p.image ? 'display:none;' : ''}">
               <i class="${iconClass}"></i>
@@ -357,9 +350,7 @@
       }
     }
 
-    function filterProducts() {
-      renderProducts();
-    }
+    function filterProducts() { renderProducts(); }
 
     function setPaymentType(type) {
       currentPaymentType = type;
@@ -369,7 +360,6 @@
       updateCartBar();
     }
 
-    // 📝 ИЗМЕНЕНО: Добавление в корзину сразу устанавливает количество, равное 1 коробке!
     function addToCart(id) { 
       const p = products.find(prod => prod.id === id);
       cart[id] = p.boxQty; 
@@ -377,21 +367,14 @@
       updateCartBar(); 
     }
 
-    // 📝 ИЗМЕНЕНО: Изменение количества шагает строго по коробкам, минуя штуки!
     function changeQty(id, direction) { 
       if (!cart[id]) return; 
       const p = products.find(prod => prod.id === id);
-      
       cart[id] += direction * p.boxQty; 
-      
-      if (cart[id] <= 0) {
-        delete cart[id]; 
-      }
+      if (cart[id] <= 0) delete cart[id]; 
       renderProducts(); 
       updateCartBar(); 
-      if (!document.getElementById('cart-modal').classList.contains('hidden')) {
-        renderCartModalItems(); 
-      }
+      if (!document.getElementById('cart-modal').classList.contains('hidden')) renderCartModalItems(); 
     }
 
     function updateCartBar() {
@@ -435,7 +418,6 @@
       }
     }
 
-    // ОТРИСОВКА ПОЗИЦИЙ В КОРЗИНЕ (Количество пишется и в штуках, и в коробках)
     function renderCartModalItems() {
       const list = document.getElementById('cart-items-list');
       list.innerHTML = "";
@@ -444,7 +426,7 @@
         const p = products.find(prod => prod.id === id);
         const price = currentPaymentType === 'prepayment' ? p.pricePrepayment : p.priceDeferment;
         const qty = cart[id];
-        const boxes = Math.round(qty / p.boxQty); // Коробки всегда круглые
+        const boxes = Math.round(qty / p.boxQty);
 
         const row = document.createElement('div');
         row.className = "bg-gray-50 p-3 rounded-xl border border-gray-100 space-y-2";
@@ -467,7 +449,6 @@
       }
     }
 
-    // ОТПРАВКА СЛОВЕСНОЙ СПЕЦИФИКАЦИИ В WHATSAPP
     function submitOrder() {
       let text = "📦 *НОВЫЙ МОБИЛЬНЫЙ ЗАКАЗ: Motive*\n";
       text += "💳 *Расчет цены:* " + (currentPaymentType === 'prepayment' ? "1. Предоплата (Столбец H)" : "2. Отсрочка (Столбец I)") + "\n";
@@ -483,7 +464,7 @@
         totalSum += sum;
         
         text += count + ") " + p.title + "\n";
-        text += "   *Арт:* " + id + " | *Кол-во:* " + qty + " шт. (" + (qty/p.boxQty).toFixed(1) + " (кор.)\n";
+        text += "   *Арт:* " + id + " | *Кол-во:* " + qty + " шт. (" + (qty/p.boxQty).toFixed(1) + " кор.)\n";
         text += "   *Цена без НДС:* " + price.toFixed(2) + " € | *Сумма:* " + sum.toFixed(2) + " €\n\n";
         count++;
       }
@@ -495,7 +476,6 @@
       window.open("https://api.whatsapp.com/send?text=" + encodeURIComponent(text), '_blank');
     }
 
-    // Автоматический запуск подгрузки данных при старте
     loadTableData();
   </script>
 </body>
