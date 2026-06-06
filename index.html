@@ -131,7 +131,7 @@
 
   <script>
     // ⚠️ ВСТАВЬТЕ СЮДА URL ВАШЕГО ВЕБ-ПРИЛОЖЕНИЯ ИЗ GOOGLE SCRIPTS (начинается с https://script.google.com/...)
-    const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxTyVuiOEc7X5AsYYkwft30L9k3okrju1f_tDfxocoPOGiBfKk55YY89F4RLCIrPYu8/exec"; 
+    const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwgpC_VtHl7LkzeG9MaeSb90Whpxy6LaD1ThKvXqQSQ6GRuVGlzwwMc9J9glNCANmVp/exec"; 
     
     // Резервный ID таблицы, если веб-приложение не настроено (сработает старый CSV-канал без картинок)
     const SPREADSHEET_ID = "1m1kAXGPAp02rqzL4X61TtCMFD6y-TRm0bmBnymBBr4Q";
@@ -144,7 +144,6 @@
 
     // ВЫГРУЗКА ИЗ ТАБЛИЦЫ ЧЕРЕЗ АППС-СКРИПТ (С АВТОМАТИЧЕСКИМ ИЗВЛЕЧЕНИЕМ СКРИНШОТОВ)
     function loadTableData() {
-      // 1. Проверяем, настроен ли адрес веб-приложения для интеллектуального парсинга скриншотов
       if (GOOGLE_WEB_APP_URL && GOOGLE_WEB_APP_URL.includes("script.google.com")) {
         const urlWithAction = GOOGLE_WEB_APP_URL + (GOOGLE_WEB_APP_URL.indexOf('?') !== -1 ? '&' : '?') + "action=get_catalog";
         
