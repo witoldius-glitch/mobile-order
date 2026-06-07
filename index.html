@@ -283,7 +283,8 @@
       let uniqueCategories = new Set();
       let lastCategory = "Разное";
 
-      for (let i = 1; i < lines.length; i++) {
+      // 📝 ИЗМЕНЕНО: Начинаем со строки 3 (индекс 2), чтобы пропустить кнопку (строка 1) и заголовки (строка 2)
+      for (let i = 2; i < lines.length; i++) {
         const row = parseCSVLine(lines[i]);
         if (!row || row.length < 9 || !row[2]) continue;
 
